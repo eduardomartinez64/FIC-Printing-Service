@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Gmail Email Processor Service - An automated service that:
-1. Scans Gmail inbox every minute for emails with subject "Batch Order Shipment Report"
+1. Scans Gmail inbox every minute for **unread** emails with subject **containing** "Batch Order Shipment Report"
 2. Extracts CSV attachments from matching emails
 3. Parses PDF links from column C (last row) of the CSV
 4. Automatically prints PDFs to remote printer via PrintNode API
+5. Marks processed emails as read to prevent reprocessing
 
 ## Architecture
 
@@ -89,13 +90,13 @@ cat logs/email_processor.log
 - Automatically refreshes expired tokens
 
 ### Email Processing Flow
-1. Search for unread emails matching subject filter
+1. Search for unread emails with subject containing the filter text (partial match)
 2. Skip already processed emails (tracked by message ID)
 3. Download CSV attachments (filters for .csv extension)
 4. Parse column C last row for PDF URL
 5. Download and print PDF via PrintNode
 6. Mark email as processed (saves ID to `processed_emails.txt`)
-7. Optionally marks email as read
+7. Mark email as read in Gmail
 
 ### CSV Parsing Logic
 - Converts column letter (e.g., 'C') to zero-based index (2)

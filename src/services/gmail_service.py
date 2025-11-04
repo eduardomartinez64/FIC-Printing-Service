@@ -65,8 +65,8 @@ class GmailService:
             List of email message objects
         """
         try:
-            # Build search query
-            query = f'subject:"{subject_filter}" has:attachment'
+            # Build search query - search unread emails with subject containing filter text
+            query = f'is:unread subject:{subject_filter} has:attachment'
             logger.debug(f"Searching emails with query: {query}")
 
             # Search for messages

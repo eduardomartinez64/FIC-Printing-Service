@@ -1,15 +1,16 @@
 # FIC Printing Service
 
-Automated service that scans Gmail inbox for emails with subject "Batch Order Shipment Report", extracts PDF links from CSV attachments (column C, last row), and prints them to a remote printer via PrintNode.
+Automated service that scans Gmail inbox for **unread** emails with subject containing "Batch Order Shipment Report", extracts PDF links from CSV attachments (column C, last row), and prints them to a remote printer via PrintNode.
 
 ## Features
 
-- Scans Gmail inbox every minute for specific emails
+- Scans Gmail inbox every minute for unread emails containing specific subject text
 - Extracts CSV attachments from matching emails
 - Parses PDF links from column C (last row) in CSV files
 - Automatically prints PDFs to remote PrintNode printer
 - Comprehensive logging of all processing attempts
 - Tracks processed emails to avoid duplicates
+- Marks processed emails as read
 - Graceful shutdown handling
 
 ## Prerequisites
