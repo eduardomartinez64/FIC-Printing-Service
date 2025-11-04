@@ -1,0 +1,15 @@
+[Unit]
+Description=FIC Printing Service
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/home/emartinez/FIC-Printing-Service
+Environment="PATH=/home/emartinez/FIC-Printing-Service/venv/bin"
+ExecStart=/home/emartinez/FIC-Printing-Service/venv/bin/python /home/emartinez/FIC-Printing-Service/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
