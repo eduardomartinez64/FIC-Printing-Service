@@ -9,6 +9,7 @@ from src.config import Config
 from src.services.gmail_service import GmailService
 from src.services.csv_parser import CSVParser
 from src.services.printnode_service import PrintNodeService
+from src.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class EmailProcessor:
         self.gmail = GmailService()
         self.printnode = PrintNodeService()
         self.csv_parser = CSVParser()
+        self.notification = NotificationService(self.gmail)
         self.processed_emails: Set[str] = self._load_processed_emails()
 
     def _load_processed_emails(self) -> Set[str]:
@@ -99,7 +101,13 @@ class EmailProcessor:
                 )
 
                 if not csv_data:
-                    logger.error("Failed to download CSV attachment")
+                    error_msg = "Failed to download CSV attachment"
+                    logger.error(error_msg)
+                    self.notification.send_error_notification(
+                        error_message=error_msg,
+                        email_id=message_id,
+                        attachment_filename=csv_attachment['filename']
+                    )
                     self._save_processed_email(message_id)
                     continue
 
@@ -107,7 +115,14 @@ class EmailProcessor:
                 pdf_link = self.csv_parser.extract_pdf_link(csv_data, column='C')
 
                 if not pdf_link:
-                    logger.error("No PDF link found in CSV column C")
+                    error_msg = "No PDF link found in CSV column C (last row)"
+                    logger.error(error_msg)
+                    self.notification.send_error_notification(
+                        error_message=error_msg,
+                        email_id=message_id,
+                        attachment_filename=csv_attachment['filename'],
+                        attachment_data=csv_data
+                    )
                     self._save_processed_email(message_id)
                     continue
 
@@ -122,7 +137,14 @@ class EmailProcessor:
                     logger.info(f"✓ Successfully printed PDF. Job ID: {job_id}")
                     printed_count += 1
                 else:
-                    logger.error("Failed to print PDF")
+                    error_msg = f"Failed to print PDF from URL: {pdf_link}"
+                    logger.error(error_msg)
+                    self.notification.send_error_notification(
+                        error_message=error_msg,
+                        email_id=message_id,
+                        attachment_filename=csv_attachment['filename'],
+                        attachment_data=csv_data
+                    )
 
                 # Mark as processed regardless of print success
                 self._save_processed_email(message_id)
@@ -136,7 +158,16 @@ class EmailProcessor:
             logger.info("=" * 60)
 
         except Exception as e:
-            logger.error(f"Error during email processing: {e}", exc_info=True)
+            error_msg = f"Unexpected error during email processing: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            # Send notification for general processing errors
+            try:
+                self.notification.send_error_notification(
+                    error_message=error_msg,
+                    email_id="N/A - General Processing Error"
+                )
+            except Exception as notify_error:
+                logger.error(f"Failed to send error notification: {notify_error}")
 
     def run_once(self):
         """Run a single processing cycle."""

@@ -17,7 +17,7 @@ class Config:
     TOKEN_FILE = BASE_DIR / "token.json"
 
     # Gmail API settings
-    GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+    GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
     EMAIL_SUBJECT_FILTER = os.getenv('EMAIL_SUBJECT_FILTER', 'Batch Order Shipment Report')
 
     # PrintNode settings
@@ -35,6 +35,9 @@ class Config:
 
     # Processed emails tracking
     PROCESSED_EMAILS_FILE = BASE_DIR / "processed_emails.txt"
+
+    # Error notification settings
+    ERROR_NOTIFICATION_EMAIL = os.getenv('ERROR_NOTIFICATION_EMAIL')
 
     @classmethod
     def validate(cls):
