@@ -26,7 +26,7 @@ class NotificationService:
             gmail_service: Authenticated GmailService instance
         """
         self.gmail_service = gmail_service
-        self.notification_email = Config.ERROR_NOTIFICATION_EMAIL
+        self.notification_emails = Config.ERROR_NOTIFICATION_EMAILS
 
     def send_error_notification(
         self,
@@ -47,14 +47,14 @@ class NotificationService:
         Returns:
             True if sent successfully, False otherwise
         """
-        if not self.notification_email:
-            logger.warning("No notification email configured, skipping error notification")
+        if not self.notification_emails:
+            logger.warning("No notification emails configured, skipping error notification")
             return False
 
         try:
             # Create message
             message = MIMEMultipart()
-            message['to'] = self.notification_email
+            message['to'] = ', '.join(self.notification_emails)
             message['subject'] = f'FIC Printing Service Error - Email ID: {email_id}'
 
             # Create email body
@@ -96,7 +96,7 @@ This is an automated notification from the FIC Printing Service.
                 body=send_message
             ).execute()
 
-            logger.info(f"Error notification sent to {self.notification_email}")
+            logger.info(f"Error notification sent to {', '.join(self.notification_emails)}")
             return True
 
         except HttpError as error:

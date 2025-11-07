@@ -37,7 +37,8 @@ class Config:
     PROCESSED_EMAILS_FILE = BASE_DIR / "processed_emails.txt"
 
     # Error notification settings
-    ERROR_NOTIFICATION_EMAIL = os.getenv('ERROR_NOTIFICATION_EMAIL')
+    _error_emails = os.getenv('ERROR_NOTIFICATION_EMAIL', '')
+    ERROR_NOTIFICATION_EMAILS = [email.strip() for email in _error_emails.split(',') if email.strip()]
 
     @classmethod
     def validate(cls):
