@@ -35,7 +35,8 @@ class PrintNodeService:
             logger.info(f"PrintNode connection successful. User: {user_info.get('firstname', 'Unknown')}")
             return True
         except requests.RequestException as e:
-            logger.error(f"PrintNode connection failed: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
+            logger.error(f"PrintNode connection failed (HTTP {status_code}): {e}")
             return False
 
     def get_printers(self) -> list:
@@ -52,7 +53,8 @@ class PrintNodeService:
             logger.info(f"Found {len(printers)} printers")
             return printers
         except requests.RequestException as e:
-            logger.error(f"Error fetching printers: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
+            logger.error(f"Error fetching printers (HTTP {status_code}): {e}")
             return []
 
     def print_pdf_from_url(self, pdf_url: str, title: str = "Batch Order Report") -> Optional[int]:
@@ -80,7 +82,8 @@ class PrintNodeService:
             return self.print_pdf(pdf_content, title)
 
         except requests.RequestException as e:
-            logger.error(f"Error downloading PDF from {pdf_url}: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
+            logger.error(f"Error downloading PDF from {pdf_url} (HTTP {status_code}): {e}")
             return None
 
     def print_pdf(self, pdf_content: bytes, title: str = "Document") -> Optional[int]:
@@ -119,10 +122,11 @@ class PrintNodeService:
             return job_id
 
         except requests.RequestException as e:
-            logger.error(f"Error submitting print job: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
+            logger.error(f"Error submitting print job (HTTP {status_code}): {e}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error during printing: {e}")
+            logger.error(f"Unexpected error during printing: {type(e).__name__}: {e}")
             return None
 
     def get_print_job_status(self, job_id: int) -> Optional[Dict]:
@@ -140,7 +144,8 @@ class PrintNodeService:
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            logger.error(f"Error fetching job status: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
+            logger.error(f"Error fetching job status (HTTP {status_code}): {e}")
             return None
 
     def verify_printer_exists(self) -> bool:

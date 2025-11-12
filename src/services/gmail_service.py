@@ -89,7 +89,9 @@ class GmailService:
             return full_messages
 
         except HttpError as error:
-            logger.error(f"Gmail API error: {error}")
+            status_code = error.resp.status if hasattr(error, 'resp') else 'unknown'
+            reason = error._get_reason() if hasattr(error, '_get_reason') else str(error)
+            logger.error(f"Gmail API error searching emails (HTTP {status_code}): {reason}")
             return []
 
     def get_message(self, message_id: str) -> Optional[Dict]:
@@ -110,7 +112,9 @@ class GmailService:
             ).execute()
             return message
         except HttpError as error:
-            logger.error(f"Error fetching message {message_id}: {error}")
+            status_code = error.resp.status if hasattr(error, 'resp') else 'unknown'
+            reason = error._get_reason() if hasattr(error, '_get_reason') else str(error)
+            logger.error(f"Gmail API error fetching message {message_id} (HTTP {status_code}): {reason}")
             return None
 
     def get_attachments(self, message: Dict) -> List[Dict]:
@@ -150,6 +154,10 @@ class GmailService:
 
         Returns:
             Attachment data as bytes or None
+
+        Raises:
+            HttpError: If the Gmail API request fails
+            Exception: For other errors during download
         """
         try:
             attachment = self.service.users().messages().attachments().get(
@@ -162,8 +170,14 @@ class GmailService:
             return data
 
         except HttpError as error:
-            logger.error(f"Error downloading attachment: {error}")
-            return None
+            # Extract status code and reason for better error context
+            status_code = error.resp.status if hasattr(error, 'resp') else 'unknown'
+            reason = error._get_reason() if hasattr(error, '_get_reason') else str(error)
+            logger.error(f"Gmail API error downloading attachment (HTTP {status_code}): {reason}")
+            raise  # Re-raise to allow caller to handle with full context
+        except Exception as error:
+            logger.error(f"Unexpected error downloading attachment: {type(error).__name__}: {error}")
+            raise  # Re-raise to allow caller to handle
 
     def mark_as_read(self, message_id: str) -> bool:
         """
@@ -184,5 +198,7 @@ class GmailService:
             logger.debug(f"Marked message {message_id} as read")
             return True
         except HttpError as error:
-            logger.error(f"Error marking message as read: {error}")
+            status_code = error.resp.status if hasattr(error, 'resp') else 'unknown'
+            reason = error._get_reason() if hasattr(error, '_get_reason') else str(error)
+            logger.error(f"Gmail API error marking message {message_id} as read (HTTP {status_code}): {reason}")
             return False

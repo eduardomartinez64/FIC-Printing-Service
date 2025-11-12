@@ -1,6 +1,7 @@
 """Configuration management for the email processor service."""
 
 import os
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -40,6 +41,9 @@ class Config:
     _error_emails = os.getenv('ERROR_NOTIFICATION_EMAIL', '')
     ERROR_NOTIFICATION_EMAILS = [email.strip() for email in _error_emails.split(',') if email.strip()]
 
+    # Email validation regex
+    EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
     @classmethod
     def validate(cls):
         """Validate required configuration."""
@@ -53,6 +57,13 @@ class Config:
 
         if not cls.PRINTNODE_PRINTER_ID:
             errors.append("PRINTNODE_PRINTER_ID not set in environment")
+
+        # Validate error notification email addresses
+        if cls.ERROR_NOTIFICATION_EMAILS:
+            invalid_emails = [e for e in cls.ERROR_NOTIFICATION_EMAILS
+                            if not cls.EMAIL_REGEX.match(e)]
+            if invalid_emails:
+                errors.append(f"Invalid error notification email addresses: {', '.join(invalid_emails)}")
 
         if errors:
             raise ValueError("Configuration errors:\n" + "\n".join(f"  - {e}" for e in errors))

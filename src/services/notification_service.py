@@ -77,15 +77,18 @@ This is an automated notification from the FIC Printing Service.
 
             # Attach the problematic file if provided
             if attachment_filename and attachment_data:
+                # Sanitize filename to prevent header injection attacks
+                safe_filename = attachment_filename.replace('\n', '').replace('\r', '').replace('"', '')
+
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload(attachment_data)
                 encoders.encode_base64(part)
                 part.add_header(
                     'Content-Disposition',
-                    f'attachment; filename= {attachment_filename}'
+                    f'attachment; filename="{safe_filename}"'
                 )
                 message.attach(part)
-                logger.debug(f"Attached file: {attachment_filename}")
+                logger.debug(f"Attached file: {safe_filename}")
 
             # Encode and send
             raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')

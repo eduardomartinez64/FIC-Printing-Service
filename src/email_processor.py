@@ -95,13 +95,24 @@ class EmailProcessor:
                 logger.info(f"Processing CSV attachment: {csv_attachment['filename']}")
 
                 # Download CSV
-                csv_data = self.gmail.download_attachment(
-                    message_id,
-                    csv_attachment['attachment_id']
-                )
+                try:
+                    csv_data = self.gmail.download_attachment(
+                        message_id,
+                        csv_attachment['attachment_id']
+                    )
+                except Exception as e:
+                    error_msg = f"Failed to download CSV attachment '{csv_attachment['filename']}': {type(e).__name__}: {str(e)}"
+                    logger.error(error_msg)
+                    self.notification.send_error_notification(
+                        error_message=error_msg,
+                        email_id=message_id,
+                        attachment_filename=csv_attachment['filename']
+                    )
+                    self._save_processed_email(message_id)
+                    continue
 
                 if not csv_data:
-                    error_msg = "Failed to download CSV attachment"
+                    error_msg = f"CSV attachment '{csv_attachment['filename']}' downloaded but was empty"
                     logger.error(error_msg)
                     self.notification.send_error_notification(
                         error_message=error_msg,

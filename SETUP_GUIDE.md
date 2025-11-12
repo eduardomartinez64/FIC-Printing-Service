@@ -128,6 +128,34 @@ You should see:
 - PrintNode connection test
 - Service starting and running checks every minute
 
+## Upgrading from Previous Versions
+
+### Gmail API Scope Change
+
+If you're upgrading from a version that used `gmail.readonly` scope, you'll need to re-authenticate:
+
+**Why?** The service now requires `gmail.modify` scope to:
+- Mark processed emails as read
+- Send error notification emails from your account
+
+**Steps to re-authenticate:**
+
+1. Delete your existing token file:
+   ```bash
+   rm token.json
+   ```
+
+2. Run the service to trigger re-authentication:
+   ```bash
+   python main.py
+   ```
+
+3. Complete the OAuth flow in your browser with the new permissions
+
+4. The service will save the new token and continue operating normally
+
+**Note:** You'll need to grant additional permissions when the browser opens. This is normal and required for the new functionality.
+
 ## Step 6: Test the Service
 
 Send yourself a test email with:

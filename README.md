@@ -144,7 +144,8 @@ FIC-Printing-Service/
 
 ### Gmail Authentication Issues
 
-- Delete `token.json` and re-authenticate
+- **Upgrading?** If you previously used an older version with `gmail.readonly` scope, delete `token.json` and re-authenticate to grant the new `gmail.modify` permissions (required for marking emails as read and sending error notifications)
+- Delete `token.json` and re-authenticate if having auth issues
 - Ensure Gmail API is enabled in Google Cloud Console
 - Check that `credentials.json` is valid
 
