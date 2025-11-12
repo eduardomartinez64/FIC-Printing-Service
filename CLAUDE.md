@@ -115,10 +115,17 @@ cat logs/email_processor.log
 - Main entry: `main.py:1`
 - Service orchestrator: `src/email_processor.py:1`
 - Gmail integration: `src/services/gmail_service.py:1`
+- Error notifications: `src/services/notification_service.py:1`
 - CSV parsing: `src/services/csv_parser.py:1`
 - PrintNode API: `src/services/printnode_service.py:1`
 - Configuration: `src/config.py:1`
 - Logging setup: `src/utils/logger.py:1`
+
+## Project Documentation
+
+- **CODE_REVIEW.md** - Latest code review findings and security analysis
+- **TODO.md** - Task tracking for improvements and enhancements
+- **SETUP_GUIDE.md** - Detailed setup and deployment instructions
 
 ## Common Tasks
 
@@ -135,3 +142,42 @@ Update `.env` file: `CHECK_INTERVAL_SECONDS=120` (for 2 minutes)
 1. Check PrintNode connection: `PrintNodeService.test_connection()`
 2. List available printers: `PrintNodeService.get_printers()`
 3. Verify printer ID matches configuration
+
+## Code Review & Quality Assurance
+
+### Recent Code Review (2025-11-12)
+A comprehensive code review was performed covering commits d73a75f through b920a5e. Key findings:
+
+**Security Issues Identified:**
+1. **CRITICAL**: Filename sanitization needed in notification service to prevent header injection
+2. **HIGH**: Email address validation missing in configuration
+
+**Features Added:**
+- Error notification system with attachment forwarding
+- Partial subject matching for more flexible email filtering
+- Automatic marking of processed emails as read
+- Gmail API scope upgraded to `gmail.modify`
+
+**Overall Assessment**: ⭐⭐⭐⭐☆ (4/5)
+- Well-implemented following project conventions
+- Good error handling and logging
+- Security issues require attention before production
+
+**Action Items**: See [TODO.md](TODO.md) for prioritized task list with implementation details.
+
+### Code Review Process
+When reviewing code changes:
+1. Use `/review` command or examine git diffs directly
+2. Focus on security, performance, testing, and documentation
+3. Document findings in [CODE_REVIEW.md](CODE_REVIEW.md)
+4. Create actionable tasks in [TODO.md](TODO.md) with:
+   - Priority levels (Critical, High, Medium, Low)
+   - Estimated effort
+   - Implementation examples
+   - Test cases needed
+
+### Known Issues & Improvements
+See [TODO.md](TODO.md) for current task tracking including:
+- **Priority 1**: Security fixes (filename sanitization, email validation)
+- **Priority 2**: Testing and documentation improvements
+- **Priority 3**: Performance enhancements (rate limiting, async notifications)
