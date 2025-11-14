@@ -12,6 +12,8 @@ Automated service that scans Gmail inbox for **unread** emails with subject cont
 - Tracks processed emails to avoid duplicates
 - Marks processed emails as read
 - Graceful shutdown handling
+- Print history tracking with statistics and CSV export
+- Automated daily email reports with print statistics (weekdays at 6 PM EST)
 
 ## Prerequisites
 
@@ -61,6 +63,9 @@ PRINTNODE_PRINTER_ID=your_printer_id
 EMAIL_SUBJECT_FILTER=Batch Order Shipment Report
 CHECK_INTERVAL_SECONDS=60
 LOG_LEVEL=INFO
+ERROR_NOTIFICATION_EMAIL=your_email@example.com
+DAILY_REPORT_EMAIL=your_email@example.com
+DAILY_REPORT_TIME=18:00  # 6 PM EST
 ```
 
 ## Usage
@@ -76,6 +81,7 @@ The service will:
 2. Run an initial email scan
 3. Continue scanning every minute
 4. Log all activity to `logs/email_processor.log`
+5. Send automated daily reports (if configured) at 6 PM EST on weekdays
 
 ### Stop the Service
 
@@ -101,6 +107,32 @@ tail -f logs/email_processor.log
 # View all logs
 cat logs/email_processor.log
 ```
+
+### Print History and Reports
+
+View print history and statistics:
+
+```bash
+# Show statistics
+python print_history.py stats
+
+# List recent print jobs
+python print_history.py list --limit 20
+
+# List failed prints only
+python print_history.py list --status failed
+
+# Export to CSV
+python print_history.py export --output reports/my_report.csv
+```
+
+Test daily report (sends actual email):
+
+```bash
+python test_daily_report.py
+```
+
+See [PRINT_HISTORY_GUIDE.md](PRINT_HISTORY_GUIDE.md) for detailed documentation.
 
 ## Testing
 
