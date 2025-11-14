@@ -10,6 +10,7 @@ from src.services.gmail_service import GmailService
 from src.services.csv_parser import CSVParser
 from src.services.printnode_service import PrintNodeService
 from src.services.notification_service import NotificationService
+from src.services.print_history import PrintHistoryService
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class EmailProcessor:
         self.printnode = PrintNodeService()
         self.csv_parser = CSVParser()
         self.notification = NotificationService(self.gmail)
+        self.print_history = PrintHistoryService()
         self.processed_emails: Set[str] = self._load_processed_emails()
 
     def _load_processed_emails(self) -> Set[str]:
@@ -139,7 +141,7 @@ class EmailProcessor:
 
                 # Print PDF
                 logger.info(f"Printing PDF: {pdf_link}")
-                job_id = self.printnode.print_pdf_from_url(
+                job_id, pdf_size = self.printnode.print_pdf_from_url(
                     pdf_link,
                     title=f"Batch Order Report - {csv_attachment['filename']}"
                 )
@@ -147,9 +149,31 @@ class EmailProcessor:
                 if job_id:
                     logger.info(f"✓ Successfully printed PDF. Job ID: {job_id}")
                     printed_count += 1
+
+                    # Log to print history
+                    self.print_history.log_print_job(
+                        email_id=message_id,
+                        csv_filename=csv_attachment['filename'],
+                        pdf_url=pdf_link,
+                        pdf_size_bytes=pdf_size,
+                        printnode_job_id=job_id,
+                        status='success'
+                    )
                 else:
                     error_msg = f"Failed to print PDF from URL: {pdf_link}"
                     logger.error(error_msg)
+
+                    # Log failed print to history
+                    self.print_history.log_print_job(
+                        email_id=message_id,
+                        csv_filename=csv_attachment['filename'],
+                        pdf_url=pdf_link,
+                        pdf_size_bytes=pdf_size,
+                        printnode_job_id=0,  # No job ID for failed prints
+                        status='failed',
+                        error_message=error_msg
+                    )
+
                     self.notification.send_error_notification(
                         error_message=error_msg,
                         email_id=message_id,

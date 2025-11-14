@@ -2,7 +2,7 @@
 
 import logging
 import requests
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 from base64 import b64encode
 
 from src.config import Config
@@ -57,7 +57,7 @@ class PrintNodeService:
             logger.error(f"Error fetching printers (HTTP {status_code}): {e}")
             return []
 
-    def print_pdf_from_url(self, pdf_url: str, title: str = "Batch Order Report") -> Optional[int]:
+    def print_pdf_from_url(self, pdf_url: str, title: str = "Batch Order Report") -> Tuple[Optional[int], int]:
         """
         Print a PDF from URL.
 
@@ -66,7 +66,7 @@ class PrintNodeService:
             title: Title for the print job
 
         Returns:
-            Print job ID if successful, None otherwise
+            Tuple of (Print job ID if successful or None, PDF size in bytes)
         """
         try:
             logger.info(f"Attempting to print PDF from URL: {pdf_url}")
@@ -75,16 +75,18 @@ class PrintNodeService:
             pdf_response = requests.get(pdf_url, timeout=30)
             pdf_response.raise_for_status()
             pdf_content = pdf_response.content
+            pdf_size = len(pdf_content)
 
-            logger.info(f"Downloaded PDF ({len(pdf_content)} bytes)")
+            logger.info(f"Downloaded PDF ({pdf_size} bytes)")
 
             # Print using PDF content
-            return self.print_pdf(pdf_content, title)
+            job_id = self.print_pdf(pdf_content, title)
+            return (job_id, pdf_size)
 
         except requests.RequestException as e:
             status_code = e.response.status_code if hasattr(e, 'response') and e.response is not None else 'unknown'
             logger.error(f"Error downloading PDF from {pdf_url} (HTTP {status_code}): {e}")
-            return None
+            return (None, 0)
 
     def print_pdf(self, pdf_content: bytes, title: str = "Document") -> Optional[int]:
         """
