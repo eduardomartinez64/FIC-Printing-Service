@@ -41,6 +41,10 @@ class Config:
     _error_emails = os.getenv('ERROR_NOTIFICATION_EMAIL', '')
     ERROR_NOTIFICATION_EMAILS = [email.strip() for email in _error_emails.split(',') if email.strip()]
 
+    # Daily report settings
+    DAILY_REPORT_EMAIL = os.getenv('DAILY_REPORT_EMAIL', '')
+    DAILY_REPORT_TIME = os.getenv('DAILY_REPORT_TIME', '18:00')  # Default 6 PM
+
     # Email validation regex
     EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
@@ -64,6 +68,10 @@ class Config:
                             if not cls.EMAIL_REGEX.match(e)]
             if invalid_emails:
                 errors.append(f"Invalid error notification email addresses: {', '.join(invalid_emails)}")
+
+        # Validate daily report email address
+        if cls.DAILY_REPORT_EMAIL and not cls.EMAIL_REGEX.match(cls.DAILY_REPORT_EMAIL):
+            errors.append(f"Invalid daily report email address: {cls.DAILY_REPORT_EMAIL}")
 
         if errors:
             raise ValueError("Configuration errors:\n" + "\n".join(f"  - {e}" for e in errors))

@@ -10,6 +10,8 @@ import schedule
 from src.utils.logger import setup_logging
 from src.config import Config
 from src.email_processor import EmailProcessor
+from src.services.gmail_service import GmailService
+from src.services.daily_report import DailyReportService
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,25 @@ def main():
     logger.info(f"Scheduling email processing every {interval_seconds} seconds")
 
     schedule.every(interval_seconds).seconds.do(processor.run_once)
+
+    # Schedule daily report if configured
+    if Config.DAILY_REPORT_EMAIL:
+        try:
+            gmail_service = GmailService()
+            daily_report = DailyReportService(gmail_service, Config.DAILY_REPORT_EMAIL)
+
+            # Schedule for weekdays only at configured time
+            report_time = Config.DAILY_REPORT_TIME
+            schedule.every().monday.at(report_time).do(daily_report.send_daily_report)
+            schedule.every().tuesday.at(report_time).do(daily_report.send_daily_report)
+            schedule.every().wednesday.at(report_time).do(daily_report.send_daily_report)
+            schedule.every().thursday.at(report_time).do(daily_report.send_daily_report)
+            schedule.every().friday.at(report_time).do(daily_report.send_daily_report)
+
+            logger.info(f"Daily report scheduled for weekdays at {report_time} EST to {Config.DAILY_REPORT_EMAIL}")
+        except Exception as e:
+            logger.error(f"Failed to setup daily report service: {e}")
+            logger.info("Continuing without daily reports")
 
     # Run immediately on startup
     logger.info("Running initial email processing cycle...")
