@@ -44,7 +44,21 @@ class GmailService:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     str(Config.CREDENTIALS_FILE), Config.GMAIL_SCOPES
                 )
-                creds = flow.run_local_server(port=0)
+                # For WSL/headless environments, use console flow instead of browser
+                try:
+                    creds = flow.run_local_server(port=0)
+                except Exception as e:
+                    logger.warning(f"Browser authentication failed ({e}), using console flow")
+                    print("\n" + "="*80)
+                    print("AUTHENTICATION REQUIRED")
+                    print("="*80)
+                    print("\nPlease visit this URL to authorize this application:\n")
+                    auth_url = flow.authorization_url(prompt='consent')[0]
+                    print(auth_url)
+                    print("\n" + "="*80)
+                    code = input('\nEnter the authorization code: ')
+                    flow.fetch_token(code=code.strip())
+                    creds = flow.credentials
 
             # Save credentials for future use
             Config.TOKEN_FILE.write_text(creds.to_json())
