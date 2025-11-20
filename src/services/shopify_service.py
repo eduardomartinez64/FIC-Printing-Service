@@ -306,8 +306,27 @@ class ShopifyService:
                 profiles_dict = {}
                 for zone in zones:
                     profile_id = zone.get('profile_id', 'default')
+
                     if profile_id not in profiles_dict:
-                        clean_name = self._extract_profile_name({'id': profile_id, 'name': ''})
+                        # Extract a name from the profile_id
+                        if isinstance(profile_id, str) and 'DeliveryProfile/' in profile_id:
+                            # Extract numeric ID from GID format
+                            parts = profile_id.split('DeliveryProfile/')
+                            if len(parts) > 1:
+                                numeric_id = parts[1].split('/')[0].split('?')[0]
+                                clean_name = f"Shipping Profile {numeric_id}"
+                            else:
+                                clean_name = "Unnamed Profile"
+                        elif profile_id == 'default':
+                            clean_name = "Default Shipping"
+                        elif profile_id:
+                            # Use profile_id directly if it's a simple value
+                            clean_name = f"Shipping Profile {profile_id}"
+                        else:
+                            clean_name = "Unnamed Profile"
+
+                        logger.info(f"Created fallback profile: {clean_name} (from profile_id: {profile_id})")
+
                         profiles_dict[profile_id] = {
                             'id': profile_id,
                             'name': clean_name,
