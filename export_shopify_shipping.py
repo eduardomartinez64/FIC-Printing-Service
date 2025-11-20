@@ -75,13 +75,16 @@ def main():
 
         # Fetch shipping data
         print("\n Fetching shipping data...")
+        print("   - Shipping profiles...")
         print("   - Shipping zones...")
         shipping_data = shopify.get_all_shipping_data()
 
+        profiles_count = len(shipping_data['profiles'])
         zones_count = len(shipping_data['shipping_zones'])
         countries_count = len(shipping_data['countries'])
         services_count = len(shipping_data['carrier_services'])
 
+        print(f"   [OK] Found {profiles_count} active shipping profiles (with products)")
         print(f"   [OK] Found {zones_count} shipping zones")
         print(f"   [OK] Found {countries_count} countries")
         print(f"   [OK] Found {services_count} carrier services")
@@ -111,12 +114,16 @@ def main():
         print(f"\n[OK] Export completed successfully!")
         print(f"\n File saved: {output_file}")
         print("\n Excel sheets created:")
-        print("   - Overview - Summary and statistics")
-        print("   - Zones - All shipping zones")
-        print("   - Rates - Detailed rate breakdown")
-        print("   - Countries - Countries and provinces per zone")
-        print("   - Carrier Services - Third-party carrier configuration")
-        print("\nTip: Tip: Use Excel filters and pivot tables to analyze and consolidate your zones")
+        print(f"   - Overview - Summary with {profiles_count} active profiles")
+
+        # List profile sheets
+        for profile in shipping_data['profiles']:
+            profile_name = profile.get('display_name') or profile.get('name', 'Unknown')
+            zone_count = len(profile.get('zones', []))
+            print(f"   - {profile_name} ({zone_count} zones)")
+
+        print("\n Tip: Each profile tab shows zones with countries and rates in an easy-to-read format")
+        print("   Only profiles with products assigned are included in this export")
 
         logger.info(f"Export completed successfully: {output_file}")
         return 0

@@ -129,10 +129,98 @@ class ShopifyService:
             logger.error(f"Failed to fetch carrier services: {e}")
             raise
 
-    def get_delivery_profiles(self) -> List[Dict]:
+    def _extract_profile_name(self, profile: Dict) -> str:
+        """
+        Extract a clean, human-readable name from a delivery profile.
+
+        Args:
+            profile: Profile dictionary from API
+
+        Returns:
+            Clean profile name string
+        """
+        # Try to get the profile name
+        name = profile.get('name', '')
+
+        # If name is a GID (gid://shopify/DeliveryProfile/...), extract a cleaner version
+        if name.startswith('gid://'):
+            # Try to get profile_id or id
+            profile_id = profile.get('profile_id') or profile.get('id', 'Unknown')
+            # Clean up the profile_id if it's also a GID
+            if isinstance(profile_id, str) and 'DeliveryProfile/' in profile_id:
+                # Extract just the number after DeliveryProfile/
+                parts = profile_id.split('DeliveryProfile/')
+                if len(parts) > 1:
+                    numeric_id = parts[1].split('/')[0].split('?')[0]
+                    name = f"Shipping Profile {numeric_id}"
+                else:
+                    name = f"Profile {profile_id}"
+            else:
+                name = f"Shipping Profile {profile_id}"
+
+        # If still no good name, try other fields
+        if not name or name.startswith('gid://'):
+            # Check if there's a legible_name field
+            name = profile.get('legible_name') or profile.get('title') or 'Unnamed Profile'
+
+        return name
+
+    def _get_profile_product_count(self, profile_id: str) -> int:
+        """
+        Get the number of products/variants assigned to a delivery profile.
+
+        Args:
+            profile_id: The profile ID (can be numeric or GID format)
+
+        Returns:
+            Number of products assigned to this profile, or -1 if unable to determine
+        """
+        try:
+            # Extract numeric ID if it's a GID
+            if isinstance(profile_id, str) and 'DeliveryProfile/' in profile_id:
+                numeric_id = profile_id.split('DeliveryProfile/')[-1].split('/')[0].split('?')[0]
+            else:
+                numeric_id = str(profile_id)
+
+            # Try to get profile details which may include product count
+            try:
+                endpoint = f'/delivery_profiles/{numeric_id}.json'
+                response = self._make_request(endpoint)
+                profile_data = response.get('delivery_profile', {})
+
+                # Check for product variant IDs or product count
+                variant_ids = profile_data.get('product_variant_ids', [])
+                if variant_ids:
+                    return len(variant_ids)
+
+                # Some Shopify versions may have a location_groups with product info
+                location_groups = profile_data.get('location_groups', [])
+                for group in location_groups:
+                    locations = group.get('locations', [])
+                    if locations:
+                        return 1  # Has locations, likely has products
+
+            except:
+                pass
+
+            # Fallback: If profile_id is 'default' or appears to be default, assume it has products
+            if profile_id == 'default' or 'default' in str(profile_id).lower():
+                return 1  # Default profile usually has products
+
+            # Unable to determine, return -1 to indicate unknown
+            return -1
+
+        except Exception as e:
+            logger.debug(f"Could not determine product count for profile {profile_id}: {e}")
+            return -1
+
+    def get_delivery_profiles(self, filter_active_only: bool = True) -> List[Dict]:
         """
         Fetch all delivery profiles (shipping profiles) from Shopify.
         Each profile contains multiple shipping zones.
+
+        Args:
+            filter_active_only: If True, only return profiles with products assigned
 
         Returns:
             List of delivery profile dictionaries with zones
@@ -145,11 +233,37 @@ class ShopifyService:
             try:
                 response = self._make_request('/delivery_profiles.json')
                 profiles = response.get('delivery_profiles', [])
-                logger.info(f"Retrieved {len(profiles)} delivery profiles")
-                return profiles
-            except:
+                logger.info(f"Retrieved {len(profiles)} delivery profiles from API")
+
+                # Enhance profiles with better names and product counts
+                enhanced_profiles = []
+                for profile in profiles:
+                    # Extract clean name
+                    clean_name = self._extract_profile_name(profile)
+                    profile['display_name'] = clean_name
+
+                    # Get product count
+                    profile_id = profile.get('id') or profile.get('profile_id', '')
+                    product_count = self._get_profile_product_count(profile_id)
+                    profile['product_count'] = product_count
+
+                    # Filter if requested
+                    if filter_active_only:
+                        # Include profile if: has products, is default, or count unknown
+                        if product_count != 0:  # Keep if has products or unknown (-1)
+                            enhanced_profiles.append(profile)
+                            logger.info(f"Including profile '{clean_name}' (products: {product_count if product_count >= 0 else 'unknown'})")
+                        else:
+                            logger.info(f"Skipping profile '{clean_name}' (no products assigned)")
+                    else:
+                        enhanced_profiles.append(profile)
+
+                logger.info(f"Returning {len(enhanced_profiles)} active delivery profiles")
+                return enhanced_profiles
+
+            except Exception as api_error:
                 # Fallback: Create a single "default" profile with all zones
-                logger.warning("Delivery profiles endpoint not available, using zones grouping")
+                logger.warning(f"Delivery profiles endpoint not available ({api_error}), using zones grouping")
                 zones = self.get_shipping_zones()
 
                 # Group zones by profile_id if available, otherwise create default profile
@@ -157,10 +271,13 @@ class ShopifyService:
                 for zone in zones:
                     profile_id = zone.get('profile_id', 'default')
                     if profile_id not in profiles_dict:
+                        clean_name = self._extract_profile_name({'id': profile_id, 'name': ''})
                         profiles_dict[profile_id] = {
                             'id': profile_id,
-                            'name': f"Shipping Profile {profile_id}" if profile_id != 'default' else "Default Shipping",
-                            'zones': []
+                            'name': clean_name,
+                            'display_name': clean_name,
+                            'zones': [],
+                            'product_count': 1  # Assume fallback profiles have products
                         }
                     profiles_dict[profile_id]['zones'].append(zone)
 

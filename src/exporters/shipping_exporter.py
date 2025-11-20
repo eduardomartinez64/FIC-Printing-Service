@@ -178,7 +178,7 @@ class ShippingExporter:
         # Add title
         sheet['A1'] = "Shopify Shipping Configuration Export"
         sheet['A1'].font = Font(size=16, bold=True, color="366092")
-        sheet.merge_cells('A1:D1')
+        sheet.merge_cells('A1:E1')
 
         # Add metadata
         row = 3
@@ -227,19 +227,30 @@ class ShippingExporter:
 
         # Header for profile list
         sheet[f'A{row}'] = "Profile Name"
-        sheet[f'B{row}'] = "Zones"
-        sheet[f'C{row}'] = "Rates"
-        sheet[f'D{row}'] = "Sheet Name"
+        sheet[f'B{row}'] = "Products"
+        sheet[f'C{row}'] = "Zones"
+        sheet[f'D{row}'] = "Rates"
+        sheet[f'E{row}'] = "Sheet Name"
 
-        for col in ['A', 'B', 'C', 'D']:
+        for col in ['A', 'B', 'C', 'D', 'E']:
             sheet[f'{col}{row}'].font = self.rate_header_font
             sheet[f'{col}{row}'].fill = self.rate_header_fill
         row += 1
 
         # List each profile
         for profile in profiles:
-            profile_name = profile.get('name', f"Profile {profile.get('id', 'Unknown')}")
+            # Use display_name (cleaned name) if available, otherwise fall back to name
+            profile_name = profile.get('display_name') or profile.get('name', f"Profile {profile.get('id', 'Unknown')}")
             zones = profile.get('zones', [])
+            product_count = profile.get('product_count', -1)
+
+            # Format product count display
+            if product_count == -1:
+                product_display = "Unknown"
+            elif product_count == 0:
+                product_display = "None"
+            else:
+                product_display = str(product_count)
 
             # Count rates in this profile
             profile_rates = 0
@@ -251,9 +262,10 @@ class ShippingExporter:
             sheet_name = self._sanitize_sheet_name(profile_name)
 
             sheet[f'A{row}'] = profile_name
-            sheet[f'B{row}'] = len(zones)
-            sheet[f'C{row}'] = profile_rates
-            sheet[f'D{row}'] = sheet_name
+            sheet[f'B{row}'] = product_display
+            sheet[f'C{row}'] = len(zones)
+            sheet[f'D{row}'] = profile_rates
+            sheet[f'E{row}'] = sheet_name
             row += 1
 
         # Add navigation instructions
@@ -264,6 +276,7 @@ class ShippingExporter:
 
         instructions = [
             "• Each shipping profile has its own tab/sheet",
+            "• Only profiles with products assigned are included",
             "• Within each profile, zones are listed with their countries and rates",
             "• Rates include: Rate Name, Price, and Description/Rule",
             "• Use this data to identify consolidation opportunities",
@@ -284,7 +297,8 @@ class ShippingExporter:
             profile: Profile dictionary containing zones
             index: Profile index for unique sheet naming
         """
-        profile_name = profile.get('name', f"Profile {profile.get('id', index)}")
+        # Use display_name (cleaned name) if available, otherwise fall back to name
+        profile_name = profile.get('display_name') or profile.get('name', f"Profile {profile.get('id', index)}")
         sheet_name = self._sanitize_sheet_name(profile_name)
 
         # Ensure unique sheet names
