@@ -173,6 +173,8 @@ cat logs/email_processor.log
 - **TODO.md** - Task tracking for improvements and enhancements
 - **SETUP_GUIDE.md** - Detailed setup and deployment instructions (Email Processor)
 - **SHOPIFY_EXPORT_GUIDE.md** - Complete guide for Shopify shipping export tool (15+ pages)
+- **SHOPIFY_QUICK_START.md** - Quick reference for running Shopify exports
+- **HANDOFF_TO_CLAUDE_WEB.md** - Handoff documentation for Excel formatting improvements
 
 ## Common Tasks
 
@@ -259,3 +261,35 @@ See [TODO.md](TODO.md) for current task tracking including:
 - **Priority 1**: Security fixes (filename sanitization, email validation)
 - **Priority 2**: Testing and documentation improvements
 - **Priority 3**: Performance enhancements (rate limiting, async notifications)
+
+## Handoff to Claude Code Web
+
+### For Excel Formatting Improvements
+
+If you need to improve the Excel export formatting, see [HANDOFF_TO_CLAUDE_WEB.md](HANDOFF_TO_CLAUDE_WEB.md) for complete handoff documentation.
+
+**Quick Summary**:
+- File to modify: `src/exporters/shipping_exporter.py`
+- Current export: 367 zones, 1,874 rates, 221 KB Excel file
+- Goal: Enhance formatting, add visual elements, improve readability
+- Testing: `python export_shopify_shipping.py`
+
+**Key Methods to Enhance**:
+- `_create_overview_sheet()` - Overview page formatting
+- `_create_zones_sheet()` - Zones data presentation
+- `_create_rates_sheet()` - Rates table styling
+- `_create_countries_sheet()` - Geographic data layout
+- `_create_carrier_services_sheet()` - Carrier services formatting
+
+**Formatting Tools Available**:
+- openpyxl 3.1.5 (already installed)
+- Font, PatternFill, Alignment, Border, Side (already imported)
+- Conditional formatting, data bars, color scales (can be added)
+- Filters, freeze panes, number formatting (can be added)
+
+**Success Criteria**:
+- Maintain data accuracy (all 367 zones, 1,874 rates)
+- Improve visual hierarchy and readability  
+- Add analysis features (filters, conditional formatting)
+- Professional appearance for stakeholder presentations
+- Complete export in < 10 seconds
