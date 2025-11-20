@@ -4,12 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gmail Email Processor Service - An automated service that:
+This repository contains two main tools:
+
+### 1. Gmail Email Processor Service
+An automated service that:
 1. Scans Gmail inbox every minute for **unread** emails with subject **containing** "Batch Order Shipment Report"
 2. Extracts CSV attachments from matching emails
 3. Parses PDF links from column C (last row) of the CSV
 4. Automatically prints PDFs to remote printer via PrintNode API
 5. Marks processed emails as read to prevent reprocessing
+
+### 2. Shopify Shipping Export Tool
+A standalone utility that:
+1. Connects to Shopify Admin API to fetch shipping configuration
+2. Exports all shipping zones, rates, and countries to Excel
+3. Creates structured multi-sheet workbook for analysis
+4. Helps consolidate and optimize shipping zone configurations
+5. See **SHOPIFY_EXPORT_GUIDE.md** for detailed usage instructions
 
 ## Architecture
 
@@ -52,10 +63,19 @@ cp .env.example .env
 
 ### Running the Service
 ```bash
-# Run service (requires credentials.json for Gmail API)
+# Run email processor service (requires credentials.json for Gmail API)
 python main.py
 
 # Stop with Ctrl+C (graceful shutdown)
+```
+
+### Running Shopify Shipping Export
+```bash
+# Export Shopify shipping data to Excel
+python export_shopify_shipping.py
+
+# Requires SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN in .env
+# See SHOPIFY_EXPORT_GUIDE.md for detailed setup instructions
 ```
 
 ### Testing
