@@ -4,22 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gmail Email Processor Service - An automated service that:
+This repository contains two main tools for Sugar Bear's FIC (FedEx International Connect) operations:
+
+### 1. Gmail Email Processor Service
+An automated service that:
 1. Scans Gmail inbox every minute for **unread** emails with subject **containing** "Batch Order Shipment Report"
 2. Extracts CSV attachments from matching emails
 3. Parses PDF links from column C (last row) of the CSV
 4. Automatically prints PDFs to remote printer via PrintNode API
 5. Marks processed emails as read to prevent reprocessing
 
+### 2. Shopify Shipping Export Tool
+A standalone tool that:
+1. Connects to Shopify Admin API to fetch all shipping data
+2. Exports 200+ shipping zones, rates, countries, and carrier services
+3. Creates formatted Excel file with multiple analysis sheets
+4. Helps identify consolidation opportunities and duplicate zones
+5. Provides comprehensive documentation for zone restructuring
+
 ## Architecture
 
 ### Core Components
 
+#### Email Processor Service
 - **EmailProcessor** (`src/email_processor.py`) - Main orchestrator that coordinates all services
 - **GmailService** (`src/services/gmail_service.py`) - Handles Gmail API authentication, email search, and attachment download
+- **NotificationService** (`src/services/notification_service.py`) - Sends error notifications with attachments
 - **CSVParser** (`src/services/csv_parser.py`) - Extracts PDF links from CSV column C (last row)
 - **PrintNodeService** (`src/services/printnode_service.py`) - Manages PrintNode API integration for remote printing
+
+#### Shopify Export Tool
+- **ShopifyService** (`src/services/shopify_service.py`) - Shopify Admin API integration for fetching shipping data
+- **ShippingExporter** (`src/exporters/shipping_exporter.py`) - Excel formatting and export logic with multiple sheets
+
+#### Shared Components
 - **Config** (`src/config.py`) - Centralized configuration management using environment variables
+- **Logger** (`src/utils/logger.py`) - Logging setup for all services
 
 ### Key Design Patterns
 
@@ -44,18 +64,36 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Edit .env with your credentials:
+# Email Processor Service:
 # - PRINTNODE_API_KEY
 # - PRINTNODE_PRINTER_ID
 # - EMAIL_SUBJECT_FILTER (default: "Batch Order Shipment Report")
 # - CHECK_INTERVAL_SECONDS (default: 60)
+# - ERROR_NOTIFICATION_EMAIL (comma-separated emails)
+
+# Shopify Export Tool:
+# - SHOPIFY_STORE_URL (your-store.myshopify.com)
+# - SHOPIFY_ACCESS_TOKEN (shpat_...)
+# - SHOPIFY_API_VERSION (default: 2024-10)
+# - EXPORT_OUTPUT_DIR (default: exports)
 ```
 
-### Running the Service
+### Running the Services
+
+#### Email Processor Service
 ```bash
-# Run service (requires credentials.json for Gmail API)
+# Run email processor (requires credentials.json for Gmail API)
 python main.py
 
 # Stop with Ctrl+C (graceful shutdown)
+```
+
+#### Shopify Export Tool
+```bash
+# Export Shopify shipping data to Excel
+python export_shopify_shipping.py
+
+# Output: exports/shopify_shipping_export_YYYYMMDD_HHMMSS.xlsx
 ```
 
 ### Testing
@@ -112,12 +150,20 @@ cat logs/email_processor.log
 
 ## File References
 
+### Email Processor Service
 - Main entry: `main.py:1`
 - Service orchestrator: `src/email_processor.py:1`
 - Gmail integration: `src/services/gmail_service.py:1`
 - Error notifications: `src/services/notification_service.py:1`
 - CSV parsing: `src/services/csv_parser.py:1`
 - PrintNode API: `src/services/printnode_service.py:1`
+
+### Shopify Export Tool
+- Main export script: `export_shopify_shipping.py:1`
+- Shopify API integration: `src/services/shopify_service.py:1`
+- Excel exporter: `src/exporters/shipping_exporter.py:1`
+
+### Shared Components
 - Configuration: `src/config.py:1`
 - Logging setup: `src/utils/logger.py:1`
 
@@ -125,23 +171,55 @@ cat logs/email_processor.log
 
 - **CODE_REVIEW.md** - Latest code review findings and security analysis
 - **TODO.md** - Task tracking for improvements and enhancements
-- **SETUP_GUIDE.md** - Detailed setup and deployment instructions
+- **SETUP_GUIDE.md** - Detailed setup and deployment instructions (Email Processor)
+- **SHOPIFY_EXPORT_GUIDE.md** - Complete guide for Shopify shipping export tool (15+ pages)
 
 ## Common Tasks
 
-### Adding New CSV Column Support
+### Email Processor Service
+
+#### Adding New CSV Column Support
 Modify `src/services/csv_parser.py:20` - change column parameter in `extract_pdf_link()` method
 
-### Changing Email Subject Filter
+#### Changing Email Subject Filter
 Update `.env` file: `EMAIL_SUBJECT_FILTER=New Subject Text`
 
-### Adjusting Scan Interval
+#### Adjusting Scan Interval
 Update `.env` file: `CHECK_INTERVAL_SECONDS=120` (for 2 minutes)
 
-### Debugging Print Issues
+#### Debugging Print Issues
 1. Check PrintNode connection: `PrintNodeService.test_connection()`
 2. List available printers: `PrintNodeService.get_printers()`
 3. Verify printer ID matches configuration
+
+### Shopify Export Tool
+
+#### Running an Export
+```bash
+python export_shopify_shipping.py
+```
+Output: `exports/shopify_shipping_export_YYYYMMDD_HHMMSS.xlsx`
+
+#### Setting Up Shopify API Access
+1. Go to Shopify Admin → Settings → Apps → Develop apps
+2. Create custom app with `read_shipping` scope
+3. Copy access token (starts with `shpat_`)
+4. Add to `.env` file as `SHOPIFY_ACCESS_TOKEN`
+5. See [SHOPIFY_EXPORT_GUIDE.md](SHOPIFY_EXPORT_GUIDE.md) for detailed setup
+
+#### Analyzing Export Data
+1. Open Excel file from `exports/` directory
+2. Review "Overview" sheet for summary statistics
+3. Use "Zones" sheet to find zones with similar rate counts
+4. Use "Rates" sheet to compare pricing structures
+5. Use "Countries" sheet for geographic analysis
+6. See [SHOPIFY_EXPORT_GUIDE.md](SHOPIFY_EXPORT_GUIDE.md) for analysis strategies
+
+#### Troubleshooting Export Issues
+- Connection failed: Verify `SHOPIFY_STORE_URL` and `SHOPIFY_ACCESS_TOKEN`
+- Permission denied: Ensure custom app has `read_shipping` scope
+- Rate limiting: Normal for 200+ zones, tool handles automatically
+- See [SHOPIFY_EXPORT_GUIDE.md](SHOPIFY_EXPORT_GUIDE.md) troubleshooting section
 
 ## Code Review & Quality Assurance
 

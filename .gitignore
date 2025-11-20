@@ -25,3 +25,5 @@ token.json
 # Service files
 processed_emails.txt
 logs/
+exports/
+.env
