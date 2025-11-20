@@ -1,20 +1,21 @@
 """
 Excel Exporter for Shopify Shipping Data.
-Exports shipping zones, profiles, and rates to structured Excel workbook.
+Exports shipping profiles with zones, countries, and rates in a hierarchical,
+easy-to-read format for logistics operations review.
 """
 
 import logging
 from datetime import datetime
 from typing import Dict, List, Any
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
 
 class ShippingExporter:
-    """Exports Shopify shipping data to Excel with multiple sheets."""
+    """Exports Shopify shipping data to Excel with one sheet per profile."""
 
     def __init__(self):
         """Initialize the exporter."""
@@ -22,18 +23,47 @@ class ShippingExporter:
         self.workbook.remove(self.workbook.active)  # Remove default sheet
 
         # Define styles
-        self.header_font = Font(bold=True, color="FFFFFF")
+        self.header_font = Font(bold=True, color="FFFFFF", size=11)
         self.header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
         self.header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    def _style_header_row(self, sheet, row_num: int = 1):
-        """Apply styling to header row."""
-        for cell in sheet[row_num]:
-            cell.font = self.header_font
-            cell.fill = self.header_fill
-            cell.alignment = self.header_alignment
+        # Zone header style (for zone names)
+        self.zone_font = Font(bold=True, size=12, color="FFFFFF")
+        self.zone_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
 
-    def _auto_adjust_columns(self, sheet):
+        # Subheader style (for "Countries Served", "Shipping Rates" sections)
+        self.subheader_font = Font(bold=True, size=11, color="FFFFFF")
+        self.subheader_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+
+        # Rate header style
+        self.rate_header_font = Font(bold=True, size=10)
+        self.rate_header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
+        # Border style
+        self.border = Border(
+            left=Side(style='thin', color='000000'),
+            right=Side(style='thin', color='000000'),
+            top=Side(style='thin', color='000000'),
+            bottom=Side(style='thin', color='000000')
+        )
+
+    def _sanitize_sheet_name(self, name: str, max_length: int = 31) -> str:
+        """
+        Sanitize sheet name to be valid for Excel.
+        Excel sheet names must be <= 31 chars and cannot contain: / \\ ? * [ ]
+        """
+        # Replace invalid characters
+        invalid_chars = ['/', '\\', '?', '*', '[', ']', ':']
+        for char in invalid_chars:
+            name = name.replace(char, '-')
+
+        # Truncate if too long
+        if len(name) > max_length:
+            name = name[:max_length]
+
+        return name
+
+    def _auto_adjust_columns(self, sheet, min_width: int = 12, max_width: int = 60):
         """Auto-adjust column widths based on content."""
         for column in sheet.columns:
             max_length = 0
@@ -42,19 +72,69 @@ class ShippingExporter:
             for cell in column:
                 try:
                     if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
+                        # Handle wrapped text - split by newlines
+                        lines = str(cell.value).split('\n')
+                        max_line_length = max(len(line) for line in lines)
+                        max_length = max(max_length, max_line_length)
                 except:
                     pass
 
-            adjusted_width = min(max_length + 2, 50)  # Cap at 50
+            adjusted_width = min(max(max_length + 2, min_width), max_width)
             sheet.column_dimensions[column_letter].width = adjusted_width
+
+    def _format_rate_description(self, rate: Dict, rate_type: str) -> str:
+        """
+        Create a human-readable description of a shipping rate rule.
+
+        Args:
+            rate: Rate dictionary
+            rate_type: Type of rate (weight, price, or carrier)
+
+        Returns:
+            Formatted description string
+        """
+        if rate_type == "weight":
+            weight_low = rate.get('weight_low', 0)
+            weight_high = rate.get('weight_high', 'unlimited')
+
+            # Format weight values
+            if weight_high == 'unlimited' or weight_high is None or weight_high == '':
+                return f"Weight: {weight_low}+ lbs"
+            else:
+                return f"Weight: {weight_low} - {weight_high} lbs"
+
+        elif rate_type == "price":
+            min_price = rate.get('min_order_subtotal')
+            max_price = rate.get('max_order_subtotal')
+
+            # Format price values
+            if min_price is None and max_price is None:
+                return "All order values"
+            elif max_price is None or max_price == '':
+                return f"Order value: ${min_price}+"
+            elif min_price is None or min_price == '':
+                return f"Order value: up to ${max_price}"
+            else:
+                return f"Order value: ${min_price} - ${max_price}"
+
+        elif rate_type == "carrier":
+            service_filter = rate.get('service_filter', {})
+            carrier_id = rate.get('carrier_service_id', 'Unknown')
+
+            if service_filter.get('*'):
+                return f"Carrier: All services (ID: {carrier_id})"
+            else:
+                services = ', '.join(service_filter.values()) if service_filter else 'All'
+                return f"Carrier: {services} (ID: {carrier_id})"
+
+        return "Standard rate"
 
     def export_to_excel(self, shipping_data: Dict[str, Any], output_file: str) -> str:
         """
-        Export shipping data to Excel file.
+        Export shipping data to Excel file with one sheet per profile.
 
         Args:
-            shipping_data: Dictionary containing shipping zones and related data
+            shipping_data: Dictionary containing profiles and related data
             output_file: Output file path
 
         Returns:
@@ -63,12 +143,24 @@ class ShippingExporter:
         logger.info(f"Starting export to: {output_file}")
 
         try:
-            # Create sheets
+            # Create overview sheet
             self._create_overview_sheet(shipping_data)
-            self._create_zones_sheet(shipping_data['shipping_zones'])
-            self._create_rates_sheet(shipping_data['shipping_zones'])
-            self._create_countries_sheet(shipping_data['shipping_zones'])
-            self._create_carrier_services_sheet(shipping_data.get('carrier_services', []))
+
+            # Create one sheet per profile
+            profiles = shipping_data.get('profiles', [])
+
+            if not profiles:
+                # Fallback: If no profiles, create from zones
+                logger.warning("No profiles found, creating single sheet from zones")
+                zones = shipping_data.get('shipping_zones', [])
+                self._create_profile_sheet({
+                    'name': 'All Shipping Zones',
+                    'id': 'default',
+                    'zones': zones
+                }, 1)
+            else:
+                for idx, profile in enumerate(profiles, 1):
+                    self._create_profile_sheet(profile, idx)
 
             # Save workbook
             self.workbook.save(output_file)
@@ -85,255 +177,272 @@ class ShippingExporter:
 
         # Add title
         sheet['A1'] = "Shopify Shipping Configuration Export"
-        sheet['A1'].font = Font(size=16, bold=True)
+        sheet['A1'].font = Font(size=16, bold=True, color="366092")
+        sheet.merge_cells('A1:D1')
 
         # Add metadata
         row = 3
-        sheet[f'A{row}'] = "Export Date:"
-        sheet[f'B{row}'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        metadata = [
+            ("Export Date:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("", ""),
+            ("Configuration Summary:", ""),
+        ]
 
-        row += 1
-        sheet[f'A{row}'] = "Total Shipping Zones:"
-        sheet[f'B{row}'] = len(shipping_data.get('shipping_zones', []))
+        for label, value in metadata:
+            sheet[f'A{row}'] = label
+            sheet[f'B{row}'] = value
+            if label:
+                sheet[f'A{row}'].font = Font(bold=True)
+            row += 1
 
-        row += 1
-        sheet[f'A{row}'] = "Total Countries:"
-        sheet[f'B{row}'] = len(shipping_data.get('countries', []))
-
-        row += 1
-        sheet[f'A{row}'] = "Total Carrier Services:"
-        sheet[f'B{row}'] = len(shipping_data.get('carrier_services', []))
-
-        # Calculate total rates
+        # Count statistics
+        profiles = shipping_data.get('profiles', [])
+        total_zones = sum(len(p.get('zones', [])) for p in profiles)
         total_rates = 0
-        for zone in shipping_data.get('shipping_zones', []):
-            for rate in zone.get('weight_based_shipping_rates', []):
-                total_rates += 1
-            for rate in zone.get('price_based_shipping_rates', []):
-                total_rates += 1
-            for rate in zone.get('carrier_shipping_rate_providers', []):
-                total_rates += 1
 
-        row += 1
-        sheet[f'A{row}'] = "Total Shipping Rates:"
-        sheet[f'B{row}'] = total_rates
+        for profile in profiles:
+            for zone in profile.get('zones', []):
+                total_rates += len(zone.get('weight_based_shipping_rates', []))
+                total_rates += len(zone.get('price_based_shipping_rates', []))
+                total_rates += len(zone.get('carrier_shipping_rate_providers', []))
 
-        # Add instructions
-        row += 3
-        sheet[f'A{row}'] = "Sheet Descriptions:"
-        sheet[f'A{row}'].font = Font(bold=True)
+        stats = [
+            ("Shipping Profiles:", len(profiles)),
+            ("Total Shipping Zones:", total_zones),
+            ("Total Shipping Rates:", total_rates),
+            ("Carrier Services:", len(shipping_data.get('carrier_services', []))),
+        ]
 
-        row += 1
-        sheet[f'A{row}'] = "• Zones: All shipping zones with basic information"
-        row += 1
-        sheet[f'A{row}'] = "• Rates: Detailed breakdown of all shipping rates by zone"
-        row += 1
-        sheet[f'A{row}'] = "• Countries: Countries and provinces included in each zone"
-        row += 1
-        sheet[f'A{row}'] = "• Carrier Services: Third-party carrier services configured"
+        for label, value in stats:
+            sheet[f'A{row}'] = label
+            sheet[f'B{row}'] = value
+            sheet[f'A{row}'].font = Font(bold=True)
+            row += 1
 
-        # Style the overview
-        for cell in sheet['A']:
-            cell.font = Font(bold=True)
+        # Add profile breakdown
+        row += 2
+        sheet[f'A{row}'] = "Shipping Profiles:"
+        sheet[f'A{row}'].font = Font(bold=True, size=12)
+        row += 1
+
+        # Header for profile list
+        sheet[f'A{row}'] = "Profile Name"
+        sheet[f'B{row}'] = "Zones"
+        sheet[f'C{row}'] = "Rates"
+        sheet[f'D{row}'] = "Sheet Name"
+
+        for col in ['A', 'B', 'C', 'D']:
+            sheet[f'{col}{row}'].font = self.rate_header_font
+            sheet[f'{col}{row}'].fill = self.rate_header_fill
+        row += 1
+
+        # List each profile
+        for profile in profiles:
+            profile_name = profile.get('name', f"Profile {profile.get('id', 'Unknown')}")
+            zones = profile.get('zones', [])
+
+            # Count rates in this profile
+            profile_rates = 0
+            for zone in zones:
+                profile_rates += len(zone.get('weight_based_shipping_rates', []))
+                profile_rates += len(zone.get('price_based_shipping_rates', []))
+                profile_rates += len(zone.get('carrier_shipping_rate_providers', []))
+
+            sheet_name = self._sanitize_sheet_name(profile_name)
+
+            sheet[f'A{row}'] = profile_name
+            sheet[f'B{row}'] = len(zones)
+            sheet[f'C{row}'] = profile_rates
+            sheet[f'D{row}'] = sheet_name
+            row += 1
+
+        # Add navigation instructions
+        row += 2
+        sheet[f'A{row}'] = "📋 How to Use This Export:"
+        sheet[f'A{row}'].font = Font(bold=True, size=11)
+        row += 1
+
+        instructions = [
+            "• Each shipping profile has its own tab/sheet",
+            "• Within each profile, zones are listed with their countries and rates",
+            "• Rates include: Rate Name, Price, and Description/Rule",
+            "• Use this data to identify consolidation opportunities",
+            "• Look for duplicate rate structures across zones",
+        ]
+
+        for instruction in instructions:
+            sheet[f'A{row}'] = instruction
+            row += 1
 
         self._auto_adjust_columns(sheet)
 
-    def _create_zones_sheet(self, zones: List[Dict]):
-        """Create shipping zones summary sheet."""
-        sheet = self.workbook.create_sheet("Zones")
+    def _create_profile_sheet(self, profile: Dict, index: int):
+        """
+        Create a sheet for a single shipping profile with hierarchical layout.
 
-        # Headers
-        headers = [
-            "Zone ID",
-            "Zone Name",
-            "# of Countries",
-            "# of Weight Rates",
-            "# of Price Rates",
-            "# of Carrier Rates",
-            "Total Rates"
-        ]
-        sheet.append(headers)
-        self._style_header_row(sheet)
+        Args:
+            profile: Profile dictionary containing zones
+            index: Profile index for unique sheet naming
+        """
+        profile_name = profile.get('name', f"Profile {profile.get('id', index)}")
+        sheet_name = self._sanitize_sheet_name(profile_name)
 
-        # Data rows
+        # Ensure unique sheet names
+        if sheet_name in self.workbook.sheetnames:
+            sheet_name = self._sanitize_sheet_name(f"{profile_name}_{index}")
+
+        sheet = self.workbook.create_sheet(sheet_name)
+        logger.info(f"Creating sheet: {sheet_name}")
+
+        row = 1
+
+        # Profile title
+        sheet[f'A{row}'] = profile_name
+        sheet[f'A{row}'].font = Font(size=14, bold=True, color="366092")
+        sheet.merge_cells(f'A{row}:D{row}')
+        row += 2
+
+        # Get zones for this profile
+        zones = profile.get('zones', [])
+
+        if not zones:
+            sheet[f'A{row}'] = "No shipping zones configured for this profile"
+            sheet[f'A{row}'].font = Font(italic=True, color="999999")
+            self._auto_adjust_columns(sheet)
+            return
+
+        # Process each zone
         for zone in zones:
-            zone_id = zone.get('id', '')
-            zone_name = zone.get('name', '')
-            num_countries = len(zone.get('countries', []))
-            num_weight_rates = len(zone.get('weight_based_shipping_rates', []))
-            num_price_rates = len(zone.get('price_based_shipping_rates', []))
-            num_carrier_rates = len(zone.get('carrier_shipping_rate_providers', []))
-            total_rates = num_weight_rates + num_price_rates + num_carrier_rates
+            zone_name = zone.get('name', 'Unnamed Zone')
 
-            sheet.append([
-                zone_id,
-                zone_name,
-                num_countries,
-                num_weight_rates,
-                num_price_rates,
-                num_carrier_rates,
-                total_rates
-            ])
+            # Zone header (merged across columns)
+            sheet[f'A{row}'] = f"📍 {zone_name}"
+            sheet.merge_cells(f'A{row}:D{row}')
+            sheet[f'A{row}'].font = self.zone_font
+            sheet[f'A{row}'].fill = self.zone_fill
+            sheet[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+            row += 1
 
-        self._auto_adjust_columns(sheet)
-        logger.info(f"Created Zones sheet with {len(zones)} zones")
+            # Countries served section
+            countries = zone.get('countries', [])
+            if countries:
+                sheet[f'A{row}'] = "Countries Served:"
+                sheet[f'A{row}'].font = self.subheader_font
+                sheet[f'A{row}'].fill = self.subheader_fill
+                sheet.merge_cells(f'A{row}:D{row}')
+                row += 1
 
-    def _create_rates_sheet(self, zones: List[Dict]):
-        """Create detailed shipping rates sheet."""
-        sheet = self.workbook.create_sheet("Rates")
+                # List countries
+                country_list = []
+                for country in countries:
+                    country_name = country.get('name', country.get('code', 'Unknown'))
+                    provinces = country.get('provinces', [])
 
-        # Headers
-        headers = [
-            "Zone ID",
-            "Zone Name",
-            "Rate Type",
-            "Rate Name",
-            "Min Value",
-            "Max Value",
-            "Price",
-            "Carrier Service"
-        ]
-        sheet.append(headers)
-        self._style_header_row(sheet)
+                    if provinces:
+                        # List specific provinces
+                        province_names = [p.get('name', p.get('code', '')) for p in provinces]
+                        country_list.append(f"{country_name} ({', '.join(province_names[:5])}{'...' if len(province_names) > 5 else ''})")
+                    else:
+                        # Entire country
+                        country_list.append(f"{country_name} (All regions)")
 
-        # Data rows
-        total_rates = 0
-        for zone in zones:
-            zone_id = zone.get('id', '')
-            zone_name = zone.get('name', '')
+                # Write countries (chunk into readable groups)
+                for i in range(0, len(country_list), 3):
+                    chunk = country_list[i:i+3]
+                    sheet[f'A{row}'] = "  • " + ", ".join(chunk)
+                    sheet.merge_cells(f'A{row}:D{row}')
+                    row += 1
 
-            # Weight-based rates
-            for rate in zone.get('weight_based_shipping_rates', []):
-                sheet.append([
-                    zone_id,
-                    zone_name,
-                    "Weight-Based",
-                    rate.get('name', ''),
-                    rate.get('weight_low', ''),
-                    rate.get('weight_high', ''),
-                    rate.get('price', ''),
-                    ''
-                ])
-                total_rates += 1
+                row += 1  # Spacing
 
-            # Price-based rates
-            for rate in zone.get('price_based_shipping_rates', []):
-                sheet.append([
-                    zone_id,
-                    zone_name,
-                    "Price-Based",
-                    rate.get('name', ''),
-                    rate.get('min_order_subtotal', ''),
-                    rate.get('max_order_subtotal', ''),
-                    rate.get('price', ''),
-                    ''
-                ])
-                total_rates += 1
+            # Shipping rates section
+            weight_rates = zone.get('weight_based_shipping_rates', [])
+            price_rates = zone.get('price_based_shipping_rates', [])
+            carrier_rates = zone.get('carrier_shipping_rate_providers', [])
 
-            # Carrier rates
-            for rate in zone.get('carrier_shipping_rate_providers', []):
-                carrier_service = rate.get('carrier_service_id', '')
-                sheet.append([
-                    zone_id,
-                    zone_name,
-                    "Carrier Service",
-                    rate.get('service_filter', {}).get('*', 'All Services'),
-                    '',
-                    '',
-                    '',
-                    carrier_service
-                ])
-                total_rates += 1
+            total_rates = len(weight_rates) + len(price_rates) + len(carrier_rates)
 
-        self._auto_adjust_columns(sheet)
-        logger.info(f"Created Rates sheet with {total_rates} rates")
+            if total_rates > 0:
+                sheet[f'A{row}'] = f"Shipping Rates ({total_rates} total):"
+                sheet[f'A{row}'].font = self.subheader_font
+                sheet[f'A{row}'].fill = self.subheader_fill
+                sheet.merge_cells(f'A{row}:D{row}')
+                row += 1
 
-    def _create_countries_sheet(self, zones: List[Dict]):
-        """Create countries/regions breakdown sheet."""
-        sheet = self.workbook.create_sheet("Countries")
+                # Rate table headers
+                sheet[f'A{row}'] = "Rate Name"
+                sheet[f'B{row}'] = "Price"
+                sheet[f'C{row}'] = "Type"
+                sheet[f'D{row}'] = "Rule / Description"
 
-        # Headers
-        headers = [
-            "Zone ID",
-            "Zone Name",
-            "Country Code",
-            "Country Name",
-            "Province Code",
-            "Province Name",
-            "Tax"
-        ]
-        sheet.append(headers)
-        self._style_header_row(sheet)
+                for col in ['A', 'B', 'C', 'D']:
+                    sheet[f'{col}{row}'].font = self.rate_header_font
+                    sheet[f'{col}{row}'].fill = self.rate_header_fill
+                    sheet[f'{col}{row}'].border = self.border
+                    sheet[f'{col}{row}'].alignment = Alignment(horizontal="center")
+                row += 1
 
-        # Data rows
-        total_entries = 0
-        for zone in zones:
-            zone_id = zone.get('id', '')
-            zone_name = zone.get('name', '')
+                # Weight-based rates
+                for rate in weight_rates:
+                    sheet[f'A{row}'] = rate.get('name', 'Unnamed Rate')
+                    sheet[f'B{row}'] = f"${rate.get('price', '0.00')}"
+                    sheet[f'C{row}'] = "Weight-Based"
+                    sheet[f'D{row}'] = self._format_rate_description(rate, 'weight')
 
-            for country in zone.get('countries', []):
-                country_code = country.get('code', '')
-                country_name = country.get('name', '')
-                tax = country.get('tax', 0)
+                    for col in ['A', 'B', 'C', 'D']:
+                        sheet[f'{col}{row}'].border = self.border
 
-                provinces = country.get('provinces', [])
-                if provinces:
-                    # If has provinces, list each province
-                    for province in provinces:
-                        sheet.append([
-                            zone_id,
-                            zone_name,
-                            country_code,
-                            country_name,
-                            province.get('code', ''),
-                            province.get('name', ''),
-                            tax
-                        ])
-                        total_entries += 1
-                else:
-                    # No provinces, just list country
-                    sheet.append([
-                        zone_id,
-                        zone_name,
-                        country_code,
-                        country_name,
-                        '',
-                        '',
-                        tax
-                    ])
-                    total_entries += 1
+                    sheet[f'B{row}'].alignment = Alignment(horizontal="right")
+                    row += 1
 
-        self._auto_adjust_columns(sheet)
-        logger.info(f"Created Countries sheet with {total_entries} entries")
+                # Price-based rates
+                for rate in price_rates:
+                    sheet[f'A{row}'] = rate.get('name', 'Unnamed Rate')
+                    sheet[f'B{row}'] = f"${rate.get('price', '0.00')}"
+                    sheet[f'C{row}'] = "Price-Based"
+                    sheet[f'D{row}'] = self._format_rate_description(rate, 'price')
 
-    def _create_carrier_services_sheet(self, carrier_services: List[Dict]):
-        """Create carrier services configuration sheet."""
-        sheet = self.workbook.create_sheet("Carrier Services")
+                    for col in ['A', 'B', 'C', 'D']:
+                        sheet[f'{col}{row}'].border = self.border
 
-        # Headers
-        headers = [
-            "Service ID",
-            "Service Name",
-            "Active",
-            "Service Discovery",
-            "Carrier Name",
-            "Admin Graphql API ID",
-            "Format"
-        ]
-        sheet.append(headers)
-        self._style_header_row(sheet)
+                    sheet[f'B{row}'].alignment = Alignment(horizontal="right")
+                    row += 1
 
-        # Data rows
-        for service in carrier_services:
-            sheet.append([
-                service.get('id', ''),
-                service.get('name', ''),
-                service.get('active', False),
-                service.get('service_discovery', False),
-                service.get('carrier_name', ''),
-                service.get('admin_graphql_api_id', ''),
-                service.get('format', '')
-            ])
+                # Carrier rates
+                for rate in carrier_rates:
+                    flat_rate = rate.get('flat_modifier_type_id')
+                    carrier_service = rate.get('carrier_service_id', 'Unknown')
 
-        self._auto_adjust_columns(sheet)
-        logger.info(f"Created Carrier Services sheet with {len(carrier_services)} services")
+                    rate_name = f"Carrier Service {carrier_service}"
+                    if flat_rate:
+                        rate_name += " (Flat Rate)"
+
+                    sheet[f'A{row}'] = rate_name
+                    sheet[f'B{row}'] = "Calculated"
+                    sheet[f'C{row}'] = "Carrier Service"
+                    sheet[f'D{row}'] = self._format_rate_description(rate, 'carrier')
+
+                    for col in ['A', 'B', 'C', 'D']:
+                        sheet[f'{col}{row}'].border = self.border
+
+                    sheet[f'B{row}'].alignment = Alignment(horizontal="right")
+                    row += 1
+
+            else:
+                sheet[f'A{row}'] = "No shipping rates configured"
+                sheet[f'A{row}'].font = Font(italic=True, color="999999")
+                row += 1
+
+            # Add spacing between zones
+            row += 2
+
+        # Auto-adjust column widths
+        self._auto_adjust_columns(sheet, min_width=15)
+
+        # Set specific column widths for better readability
+        sheet.column_dimensions['A'].width = 35  # Rate Name
+        sheet.column_dimensions['B'].width = 12  # Price
+        sheet.column_dimensions['C'].width = 18  # Type
+        sheet.column_dimensions['D'].width = 50  # Description
+
+        logger.info(f"Completed sheet '{sheet_name}' with {len(zones)} zones")

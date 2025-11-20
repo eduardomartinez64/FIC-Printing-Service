@@ -129,17 +129,61 @@ class ShopifyService:
             logger.error(f"Failed to fetch carrier services: {e}")
             raise
 
-    def get_all_shipping_data(self) -> Dict[str, Any]:
+    def get_delivery_profiles(self) -> List[Dict]:
         """
-        Fetch comprehensive shipping configuration data.
+        Fetch all delivery profiles (shipping profiles) from Shopify.
+        Each profile contains multiple shipping zones.
 
         Returns:
-            Dictionary containing zones, countries, and carrier services
+            List of delivery profile dictionaries with zones
+        """
+        logger.info("Fetching delivery profiles...")
+
+        try:
+            # Note: Delivery profiles endpoint might not be available in all Shopify plans
+            # If it fails, we'll fall back to grouping zones
+            try:
+                response = self._make_request('/delivery_profiles.json')
+                profiles = response.get('delivery_profiles', [])
+                logger.info(f"Retrieved {len(profiles)} delivery profiles")
+                return profiles
+            except:
+                # Fallback: Create a single "default" profile with all zones
+                logger.warning("Delivery profiles endpoint not available, using zones grouping")
+                zones = self.get_shipping_zones()
+
+                # Group zones by profile_id if available, otherwise create default profile
+                profiles_dict = {}
+                for zone in zones:
+                    profile_id = zone.get('profile_id', 'default')
+                    if profile_id not in profiles_dict:
+                        profiles_dict[profile_id] = {
+                            'id': profile_id,
+                            'name': f"Shipping Profile {profile_id}" if profile_id != 'default' else "Default Shipping",
+                            'zones': []
+                        }
+                    profiles_dict[profile_id]['zones'].append(zone)
+
+                profiles = list(profiles_dict.values())
+                logger.info(f"Grouped zones into {len(profiles)} profile(s)")
+                return profiles
+
+        except Exception as e:
+            logger.error(f"Failed to fetch delivery profiles: {e}")
+            raise
+
+    def get_all_shipping_data(self) -> Dict[str, Any]:
+        """
+        Fetch comprehensive shipping configuration data organized by profiles.
+
+        Returns:
+            Dictionary containing profiles (with zones), countries, and carrier services
         """
         logger.info("Fetching all shipping data...")
 
         data = {
-            'shipping_zones': self.get_shipping_zones(),
+            'profiles': self.get_delivery_profiles(),
+            'shipping_zones': self.get_shipping_zones(),  # Keep for backward compatibility
             'countries': self.get_countries(),
             'carrier_services': self.get_carrier_services()
         }

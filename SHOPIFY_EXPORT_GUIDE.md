@@ -102,100 +102,233 @@ Expected output:
 
 ## Excel Output Structure
 
-The exported Excel file contains **5 sheets**:
+The exported Excel file is organized **by shipping profile**, with each profile having its own tab. This makes it easy for your logistics team to review and optimize rates.
 
-### 1. Overview Sheet
-- Export timestamp
-- Summary statistics (total zones, rates, countries)
-- Sheet descriptions
+### Overview Sheet
 
-### 2. Zones Sheet
-All shipping zones with counts:
-- Zone ID
-- Zone Name
-- Number of Countries
-- Number of Weight-Based Rates
-- Number of Price-Based Rates
-- Number of Carrier Rates
-- Total Rates
+The first sheet provides a summary:
+- **Export timestamp** and date
+- **Summary statistics**: Total profiles, zones, rates, carrier services
+- **Profile breakdown table**: Shows each profile with its zone count, rate count, and sheet name
+- **Navigation instructions**: How to use the export
 
-**Use this to:** Identify zones with similar configurations that can be merged.
+### Profile Sheets (One per Shipping Profile)
 
-### 3. Rates Sheet
-Detailed breakdown of ALL shipping rates:
-- Zone ID & Name
-- Rate Type (Weight-Based, Price-Based, or Carrier Service)
-- Rate Name
-- Min/Max Values (weight or price thresholds)
-- Price
-- Carrier Service (if applicable)
+Each shipping profile gets its own dedicated sheet with a **hierarchical, easy-to-read layout**:
 
-**Use this to:**
-- Compare pricing across zones
-- Find duplicate rate structures
-- Identify consolidation opportunities
-
-### 4. Countries Sheet
-Countries and provinces included in each zone:
-- Zone ID & Name
-- Country Code & Name
-- Province Code & Name (if specific provinces)
-- Tax percentage
-
-**Use this to:**
-- See which countries/states are in which zones
-- Identify overlapping geographic coverage
-- Plan zone consolidation based on geography
-
-### 5. Carrier Services Sheet
-Third-party shipping carriers configured:
-- Service ID & Name
-- Active status
-- Service Discovery enabled
-- Carrier Name
-- Format
-
-**Use this to:** Understand which carrier services are integrated.
-
-## Analyzing Your Data
-
-### Finding Consolidation Opportunities
-
-#### 1. Sort by Rate Count (Zones sheet)
-- Zones with 1-2 rates might be candidates for merging
-- Look for zones with identical rate counts
-
-#### 2. Compare Rate Structures (Rates sheet)
-- Use Excel's filter/sort to group by "Rate Type" and "Price"
-- Find zones with identical pricing → can likely be merged
-- Example: If Zone A and Zone B both have "$5 for 0-5 lbs", they might be mergeable
-
-#### 3. Geographic Analysis (Countries sheet)
-- Filter by country to see all zones covering that country
-- Look for overlapping coverage that could be consolidated
-- Example: Multiple zones for different US states could potentially become one zone
-
-#### 4. Pivot Table Analysis
-Create a pivot table to summarize:
-- **Rows**: Zone Name
-- **Values**: Count of Rates, Count of Countries
-- **Filter**: Rate Type
-
-This helps visualize which zones have similar characteristics.
-
-### Example Consolidation Workflow
+#### Profile Sheet Structure:
 
 ```
-1. Open Excel file
-2. Go to "Rates" sheet
-3. Add Filter (Data → Filter)
-4. Sort by "Price" column
-5. Identify zones with same pricing structure
-6. Check "Countries" sheet to verify geographic coverage doesn't conflict
-7. Document zones to merge
-8. Test consolidation in Shopify (start with 2-3 zones)
-9. Re-export to verify changes
+[Profile Name]
+
+📍 Zone Name 1
+   Countries Served:
+      • United States (All regions), Canada (Ontario, Quebec, ...)
+      • United Kingdom (All regions)
+
+   Shipping Rates (5 total):
+      ┌─────────────────────────────┬─────────┬──────────────┬────────────────────────────┐
+      │ Rate Name                   │ Price   │ Type         │ Rule / Description         │
+      ├─────────────────────────────┼─────────┼──────────────┼────────────────────────────┤
+      │ Standard Shipping           │ $5.00   │ Weight-Based │ Weight: 0 - 5 lbs         │
+      │ Heavy Package               │ $15.00  │ Weight-Based │ Weight: 5 - 20 lbs        │
+      │ Free Shipping               │ $0.00   │ Price-Based  │ Order value: $50+         │
+      │ Express Shipping            │ $12.00  │ Weight-Based │ Weight: 0 - 10 lbs        │
+      │ Carrier Calculated          │ Calc.   │ Carrier      │ Carrier: All services     │
+      └─────────────────────────────┴─────────┴──────────────┴────────────────────────────┘
+
+📍 Zone Name 2
+   Countries Served:
+      • Mexico (All regions), Brazil (Sao Paulo, Rio de Janeiro)
+
+   Shipping Rates (3 total):
+      [... rate table ...]
 ```
+
+#### What Makes This Format Perfect for Review:
+
+1. **Profile-Based Organization**: Each profile is isolated in its own sheet - no need to filter or search
+2. **Visual Hierarchy**: Color-coded headers (blue for zones, green for sections) make scanning easy
+3. **Clear Geographic Coverage**: See at a glance which countries/regions each zone serves
+4. **Detailed Rate Information**:
+   - **Rate Name**: What customers see
+   - **Price**: Exact shipping cost
+   - **Type**: Weight-Based, Price-Based, or Carrier Service
+   - **Rule/Description**: Human-readable conditions (e.g., "Weight: 0-5 lbs", "Order value: $50+")
+5. **Grouped by Zone**: All related information for each zone is together
+
+#### Rate Description Examples:
+
+The **Rule / Description** column automatically formats rate conditions for easy understanding:
+
+- **Weight-Based**:
+  - `Weight: 0 - 5 lbs`
+  - `Weight: 10+ lbs`
+- **Price-Based**:
+  - `Order value: $0 - $50`
+  - `Order value: $100+`
+  - `All order values`
+- **Carrier Service**:
+  - `Carrier: All services (ID: 12345)`
+  - `Carrier: Express, Overnight (ID: 67890)`
+
+## Analyzing Your Data for Consolidation
+
+### Step-by-Step Consolidation Workflow
+
+#### Step 1: Review Each Profile
+
+Start with the **Overview sheet** to see all your profiles:
+1. Note which profiles have the most zones (prime candidates for consolidation)
+2. Click through to each profile's sheet to review
+
+#### Step 2: Identify Duplicate Rate Structures
+
+Within each profile sheet:
+
+**Method A - Visual Comparison:**
+1. Scroll through zones in the profile
+2. Look for zones with identical rate tables
+3. Compare the "Price" and "Rule/Description" columns
+4. If two zones have the same rates, they're merge candidates
+
+**Example:**
+```
+Zone: US East Coast
+  Standard: $5.00 (Weight: 0-5 lbs)
+  Express: $12.00 (Weight: 0-10 lbs)
+
+Zone: US West Coast
+  Standard: $5.00 (Weight: 0-5 lbs)  ← Same rates!
+  Express: $12.00 (Weight: 0-10 lbs) ← Same rates!
+```
+✅ These zones can likely be merged!
+
+**Method B - Excel Analysis:**
+1. Copy all rate data from a profile sheet
+2. Paste into a new sheet
+3. Sort by "Price" column
+4. Use conditional formatting to highlight duplicates
+5. Group zones with matching prices and rules
+
+#### Step 3: Check Geographic Compatibility
+
+Before merging zones with identical rates, verify their geographic coverage doesn't conflict:
+
+1. Look at the **Countries Served** section for each zone
+2. Ensure there's no overlap (same country in multiple zones)
+3. If no overlap → safe to merge
+4. If overlap → investigate why separate zones exist (might be intentional)
+
+**Example - Safe to Merge:**
+```
+Zone A: United States, Canada
+Zone B: United Kingdom, France
+→ No overlap, can merge if rates are identical
+```
+
+**Example - Investigate First:**
+```
+Zone A: United States (California, New York)
+Zone B: United States (Texas, Florida)
+→ Same country, different states - might be intentional
+```
+
+#### Step 4: Document Consolidation Opportunities
+
+Create a consolidation plan:
+
+1. Open a new Excel sheet or document
+2. For each merge opportunity, note:
+   - Profile name
+   - Zones to merge (list their names)
+   - New zone name suggestion
+   - Countries that will be covered
+   - Rate structure (confirm all zones have same rates)
+   - Estimated savings (number of zones reduced)
+
+**Template:**
+```
+Profile: International Shipping
+Merge: "Europe Zone 1" + "Europe Zone 2" + "Europe Zone 3"
+Into: "Europe - All Countries"
+Countries: UK, France, Germany, Italy, Spain, Netherlands
+Rates: Standard $15 (0-5 lbs), Express $25 (0-10 lbs)
+Savings: 3 zones → 1 zone (67% reduction)
+```
+
+#### Step 5: Prioritize by Impact
+
+Focus on high-impact consolidations first:
+
+1. **Large profile with many zones**: Start with profiles that have 50+ zones
+2. **Simple rate structures**: Merge zones with 1-2 rates first (less risk)
+3. **Geographic groups**: Merge regional zones (e.g., all European countries)
+4. **Identical rates across zones**: These are the safest merges
+
+### Example Consolidation Scenario
+
+**Before:** 200 shipping zones across 3 profiles
+
+**Analysis findings:**
+- Profile 1 "Domestic Shipping": 150 zones for US states
+  - 120 zones have identical rates: $5 (0-5 lbs), $10 (5-15 lbs)
+  - Each state is a separate zone
+  - **Consolidation**: Merge into 5 regional zones (Northeast, Southeast, Midwest, Southwest, West)
+  - **Result**: 150 → 5 zones (97% reduction!)
+
+- Profile 2 "International": 40 zones for different countries
+  - 15 European zones all have same rates
+  - 10 Asian zones have same rates
+  - **Consolidation**: Create "Europe" and "Asia" zones
+  - **Result**: 40 → 17 zones (58% reduction)
+
+- Profile 3 "Express Shipping": 10 zones
+  - Already optimized, no changes needed
+
+**After:** 22 shipping zones total (89% reduction!)
+
+### Common Patterns to Look For
+
+When reviewing your 200 zones, look for these common over-segmentation patterns:
+
+1. **State-by-state zones**: Most stores don't need separate zones per US state
+2. **Duplicate international zones**: Multiple zones for same country with identical rates
+3. **Historical zones**: Zones created for one-off promotions that are no longer used
+4. **Test zones**: Zones created during setup but never removed
+5. **Over-granular weight tiers**: Too many weight brackets (consolidate if possible)
+
+### Quick Review Workflow
+
+**For a 200-zone consolidation project:**
+
+1. **Day 1**: Export data and review Overview sheet (30 min)
+   - Identify which profiles have the most zones
+   - Set consolidation targets (e.g., reduce by 75%)
+
+2. **Day 2-3**: Profile-by-profile analysis (2-4 hours)
+   - Open each profile sheet
+   - Scroll through and mark zones with identical rates
+   - Create consolidation plan document
+
+3. **Day 4**: Geographic verification (1-2 hours)
+   - Review countries served for each merge candidate
+   - Confirm no conflicts
+
+4. **Day 5**: Test in Shopify (2 hours)
+   - Start with 5-10 zone merges
+   - Verify functionality
+   - Check customer checkout experience
+
+5. **Week 2**: Full implementation (4-6 hours)
+   - Execute consolidation plan in batches
+   - Re-export after each batch to verify
+   - Update documentation
+
+6. **Week 3**: Monitor and optimize
+   - Watch for any customer shipping issues
+   - Fine-tune rates if needed
+   - Re-export final configuration
 
 ## Troubleshooting
 
