@@ -97,7 +97,12 @@ def main():
 
         # Export to Excel
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"shopify_shipping_export_{timestamp}.xlsx"
+        output_dir = os.getenv('EXPORT_OUTPUT_DIR', 'exports')
+
+        # Create exports directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        output_file = os.path.join(output_dir, f"shopify_shipping_export_{timestamp}.xlsx")
 
         print(f"\n Exporting to Excel: {output_file}")
         exporter = ShippingExporter()
