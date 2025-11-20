@@ -142,28 +142,54 @@ class ShopifyService:
         # Try to get the profile name
         name = profile.get('name', '')
 
-        # If name is a GID (gid://shopify/DeliveryProfile/...), extract a cleaner version
-        if name.startswith('gid://'):
-            # Try to get profile_id or id
-            profile_id = profile.get('profile_id') or profile.get('id', 'Unknown')
-            # Clean up the profile_id if it's also a GID
+        # Check if there's a legible_name or title field first (more human-readable)
+        legible_name = profile.get('legible_name') or profile.get('title')
+        if legible_name and not legible_name.startswith('gid://'):
+            return legible_name
+
+        # If name is a GID (gid://shopify/DeliveryProfile/...), extract the ID
+        if name and name.startswith('gid://'):
+            # Extract ID from GID string
+            if 'DeliveryProfile/' in name:
+                parts = name.split('DeliveryProfile/')
+                if len(parts) > 1:
+                    numeric_id = parts[1].split('/')[0].split('?')[0]
+                    return f"Shipping Profile {numeric_id}"
+
+        # Try to get profile_id or id field
+        profile_id = profile.get('profile_id') or profile.get('id')
+
+        if profile_id:
+            # If profile_id is also a GID, extract numeric part
             if isinstance(profile_id, str) and 'DeliveryProfile/' in profile_id:
-                # Extract just the number after DeliveryProfile/
                 parts = profile_id.split('DeliveryProfile/')
                 if len(parts) > 1:
                     numeric_id = parts[1].split('/')[0].split('?')[0]
-                    name = f"Shipping Profile {numeric_id}"
-                else:
-                    name = f"Profile {profile_id}"
+                    return f"Shipping Profile {numeric_id}"
             else:
-                name = f"Shipping Profile {profile_id}"
+                # Use profile_id directly if it's not a GID
+                if profile_id != 'default':
+                    return f"Shipping Profile {profile_id}"
+                else:
+                    return "Default Shipping"
 
-        # If still no good name, try other fields
-        if not name or name.startswith('gid://'):
-            # Check if there's a legible_name field
-            name = profile.get('legible_name') or profile.get('title') or 'Unnamed Profile'
+        # If we have a non-empty name that's not a GID, use it
+        if name and not name.startswith('gid://'):
+            return name
 
-        return name
+        # Last resort - check all profile fields for any identifier
+        logger.warning(f"Could not extract readable name from profile. Keys available: {list(profile.keys())}")
+
+        # Try admin_graphql_api_id as last resort
+        graphql_id = profile.get('admin_graphql_api_id', '')
+        if graphql_id and 'DeliveryProfile/' in graphql_id:
+            parts = graphql_id.split('DeliveryProfile/')
+            if len(parts) > 1:
+                numeric_id = parts[1].split('/')[0].split('?')[0]
+                return f"Shipping Profile {numeric_id}"
+
+        logger.warning("Falling back to 'Unnamed Profile'")
+        return "Unnamed Profile"
 
     def _get_profile_product_count(self, profile_id: str) -> int:
         """
@@ -237,10 +263,20 @@ class ShopifyService:
 
                 # Enhance profiles with better names and product counts
                 enhanced_profiles = []
-                for profile in profiles:
+                for idx, profile in enumerate(profiles):
+                    logger.info(f"Processing profile {idx + 1}/{len(profiles)}")
+                    logger.debug(f"Profile fields: {list(profile.keys())}")
+
+                    # Log key fields for debugging
+                    logger.info(f"  - id: {profile.get('id')}")
+                    logger.info(f"  - name: {profile.get('name')}")
+                    logger.info(f"  - profile_id: {profile.get('profile_id')}")
+                    logger.info(f"  - legible_name: {profile.get('legible_name')}")
+
                     # Extract clean name
                     clean_name = self._extract_profile_name(profile)
                     profile['display_name'] = clean_name
+                    logger.info(f"  - Extracted display_name: {clean_name}")
 
                     # Get product count
                     profile_id = profile.get('id') or profile.get('profile_id', '')
